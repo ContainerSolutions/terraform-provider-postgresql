@@ -41,7 +41,7 @@ func resourcePostgreSQLDefaultPrivileges() *schema.Resource {
 			},
 			"schema": {
 				Type:        schema.TypeString,
-				Required:    true,
+				Optional:    true,
 				ForceNew:    true,
 				Description: "The database schema to set default privileges for this role",
 			},
@@ -180,6 +180,7 @@ func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 	JOIN pg_namespace ON pg_namespace.oid = namespace
 	WHERE grantee_oid = $1 AND nspname = $2 AND pg_get_userbyid(grantor_oid) = $4;
 `
+
 	var privileges pq.ByteaArray
 
 	if err := txn.QueryRow(
@@ -219,6 +220,14 @@ func grantRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		pq.QuoteIdentifier(role),
 	)
 
+	if pgSchema == "" {
+		query = fmt.Sprintf("ALTER DEFAULT PRIVILEGES GRANT %s ON %sS TO %s",
+			strings.Join(privileges, ","),
+			strings.ToUpper(d.Get("object_type").(string)),
+			pq.QuoteIdentifier(role),
+		)
+	}
+
 	_, err := txn.Exec(
 		query,
 	)
@@ -230,6 +239,7 @@ func grantRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 }
 
 func revokeRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
+	pgSchema := d.Get("schema").(string)
 	query := fmt.Sprintf(
 		"ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA %s REVOKE ALL ON %sS FROM %s",
 		pq.QuoteIdentifier(d.Get("owner").(string)),
@@ -237,6 +247,14 @@ func revokeRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		strings.ToUpper(d.Get("object_type").(string)),
 		pq.QuoteIdentifier(d.Get("role").(string)),
 	)
+
+	if pgSchema == "" {
+		query = fmt.Sprintf(
+			"ALTER DEFAULT PRIVILEGES REVOKE ALL ON %sS FROM %s",
+			strings.ToUpper(d.Get("object_type").(string)),
+			pq.QuoteIdentifier(d.Get("role").(string)),
+		)
+	}
 
 	if _, err := txn.Exec(query); err != nil {
 		return fmt.Errorf("could not revoke default privileges: %w", err)
