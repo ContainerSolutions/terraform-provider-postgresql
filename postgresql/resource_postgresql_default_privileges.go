@@ -89,6 +89,8 @@ func resourcePostgreSQLDefaultPrivilegesRead(db *DBConnection, d *schema.Resourc
 }
 
 func resourcePostgreSQLDefaultPrivilegesCreate(db *DBConnection, d *schema.ResourceData) error {
+	log.Println("[DEBUG] Something happened!")
+
 	if err := validatePrivileges(d); err != nil {
 		return err
 	}
@@ -159,6 +161,7 @@ func resourcePostgreSQLDefaultPrivilegesDelete(db *DBConnection, d *schema.Resou
 }
 
 func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
+	log.Println("[INFO] In readRoleDefaultPrivileges")
 	role := d.Get("role").(string)
 	owner := d.Get("owner").(string)
 	pgSchema := d.Get("schema").(string)
@@ -169,10 +172,11 @@ func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		return err
 	}
 
-	// This query aggregates the list of default privileges type (prtype)
-	// for the role (grantee), owner (grantor), schema (namespace name)
-	// and the specified object type (defaclobjtype).
-	query := `SELECT array_agg(prtype) FROM (
+	var query string
+	var queryArgs []interface{}
+
+	if pgSchema != "" {
+		query = `SELECT array_agg(prtype) FROM (
 		SELECT defaclnamespace, (aclexplode(defaclacl)).* FROM pg_default_acl
 		WHERE defaclobjtype = $3
 	) AS t (namespace, grantor_oid, grantee_oid, prtype, grantable)
@@ -180,15 +184,31 @@ func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 	JOIN pg_namespace ON pg_namespace.oid = namespace
 	WHERE grantee_oid = $1 AND nspname = $2 AND pg_get_userbyid(grantor_oid) = $4;
 `
+		queryArgs = []interface{}{roleOID, pgSchema, objectTypes[objectType], owner}
+	} else {
+		query = `SELECT array_agg(prtype) FROM (
+		SELECT defaclnamespace, (aclexplode(defaclacl)).* FROM pg_default_acl
+		WHERE defaclobjtype = $2
+	) AS t (namespace, grantor_oid, grantee_oid, prtype, grantable)
+	WHERE grantee_oid = $1 AND pg_get_userbyid(grantor_oid) = $3;
+`
+		queryArgs = []interface{}{roleOID, objectTypes[objectType], owner}
+	}
+
+	// This query aggregates the list of default privileges type (prtype)
+	// for the role (grantee), owner (grantor), schema (namespace name)
+	// and the specified object type (defaclobjtype).
 
 	var privileges pq.ByteaArray
 
 	if err := txn.QueryRow(
-		query, roleOID, pgSchema, objectTypes[objectType], owner,
+		query, queryArgs...,
 	).Scan(&privileges); err != nil {
 		return fmt.Errorf("could not read default privileges: %w", err)
 	}
 
+	log.Printf("[DEBUG] %s\n", privileges)
+	log.Printf("[DEBUG] %s\n", privileges)
 	// We consider no privileges as "not exists"
 	if len(privileges) == 0 {
 		log.Printf("[DEBUG] no default privileges for role %s in schema %s", role, pgSchema)
@@ -263,8 +283,17 @@ func revokeRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 }
 
 func generateDefaultPrivilegesID(d *schema.ResourceData) string {
+	pgSchema := d.Get("schema").(string)
+	if pgSchema != "" {
+		return strings.Join([]string{
+			d.Get("role").(string), d.Get("database").(string), pgSchema,
+			d.Get("owner").(string), d.Get("object_type").(string),
+		}, "_")
+	}
+
 	return strings.Join([]string{
-		d.Get("role").(string), d.Get("database").(string), d.Get("schema").(string),
+		d.Get("role").(string), d.Get("database").(string),
 		d.Get("owner").(string), d.Get("object_type").(string),
 	}, "_")
+
 }
