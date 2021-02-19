@@ -146,14 +146,16 @@ resource "postgresql_default_privileges" "test_ro" {
 	})
 }
 
+// Test the case where we define default priviliges without specifying a schema. These
+// priviliges should apply to newly created resources for the named role in all schema.
 func TestAccPostgresqlDefaultPrivileges_NoSchema(t *testing.T) {
 	skipIfNotAcc(t)
 
 	// We have to create the database outside of resource.Test
 	// because we need to create a table to assert that grant are correctly applied
 	// and we don't have this resource yet
-	dbSuffix, _ := setupTestDatabase(t, true, true)
-	//defer teardown()
+	dbSuffix, teardown := setupTestDatabase(t, true, true)
+	defer teardown()
 
 	config := getTestConfig(t)
 	dbName, roleName := getTestDBNames(dbSuffix)
@@ -171,33 +173,7 @@ resource "postgresql_default_privileges" "test_ro" {
 	object_type = "table"
 	privileges   = %%s
 }
-
-resource "postgresql_schema" "test_schema_a" {
-	database    = "%s"
-  name  = "test_schema_a"
-}
-
-resource "postgresql_schema" "test_schema_b" {
-	database    = "%s"
-  name  = "test_schema_b"
-}
-
-resource "postgresql_grant" "usage_schema_a" {
-  database    = "%s"
-  role        = "%s"
-  schema      = "test_schema_a"
-  object_type = "schema"
-  privileges  = ["USAGE"]
-}
-
-resource "postgresql_grant" "usage_schema_b" {
-  database    = "%s"
-  role        = "%s"
-  schema      = "test_schema_b"
-  object_type = "schema"
-  privileges  = ["USAGE"]
-}
-	`, dbName, config.Username, role, dbName, dbName, dbName, role, dbName, role)
+	`, dbName, config.Username, role)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck: func() {
@@ -210,7 +186,7 @@ resource "postgresql_grant" "usage_schema_b" {
 						Config: fmt.Sprintf(tfConfig, `["SELECT"]`),
 						Check: resource.ComposeTestCheckFunc(
 							func(*terraform.State) error {
-								tables := []string{"test_schema_a.test_table", "test_schema_b.test_table"}
+								tables := []string{"test_schema.test_table", "dev_schema.test_table"}
 								// To test default privileges, we need to create a table
 								// after having apply the state.
 								dropFunc := createTestTables(t, dbSuffix, tables, "")
@@ -227,7 +203,7 @@ resource "postgresql_grant" "usage_schema_b" {
 						Config: fmt.Sprintf(tfConfig, `["SELECT", "UPDATE"]`),
 						Check: resource.ComposeTestCheckFunc(
 							func(*terraform.State) error {
-								tables := []string{"test_schema_a.test_table"}
+								tables := []string{"test_schema.test_table", "dev_schema.test_table"}
 								// To test default privileges, we need to create a table
 								// after having apply the state.
 								dropFunc := createTestTables(t, dbSuffix, tables, "")
