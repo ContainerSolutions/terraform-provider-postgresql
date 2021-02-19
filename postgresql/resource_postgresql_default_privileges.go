@@ -227,22 +227,20 @@ func grantRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		privileges = append(privileges, priv.(string))
 	}
 
-	query := fmt.Sprintf("ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA %s GRANT %s ON %sS TO %s",
+	var inSchema string
+
+	// If a schema is specified we need to build the part of the query string to action this
+	if pgSchema != "" {
+		inSchema = fmt.Sprintf("IN SCHEMA %s", pq.QuoteIdentifier(pgSchema))
+	}
+
+	query := fmt.Sprintf("ALTER DEFAULT PRIVILEGES FOR ROLE %s %s GRANT %s ON %sS TO %s",
 		pq.QuoteIdentifier(d.Get("owner").(string)),
-		pq.QuoteIdentifier(pgSchema),
+		inSchema,
 		strings.Join(privileges, ","),
 		strings.ToUpper(d.Get("object_type").(string)),
 		pq.QuoteIdentifier(role),
 	)
-
-	if pgSchema == "" {
-		query = fmt.Sprintf("ALTER DEFAULT PRIVILEGES FOR ROLE %s GRANT %s ON %sS TO %s",
-			pq.QuoteIdentifier(d.Get("owner").(string)),
-			strings.Join(privileges, ","),
-			strings.ToUpper(d.Get("object_type").(string)),
-			pq.QuoteIdentifier(role),
-		)
-	}
 
 	_, err := txn.Exec(
 		query,
@@ -256,22 +254,20 @@ func grantRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 
 func revokeRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 	pgSchema := d.Get("schema").(string)
+
+	var inSchema string
+
+	// If a schema is specified we need to build the part of the query string to action this
+	if pgSchema != "" {
+		inSchema = fmt.Sprintf("IN SCHEMA %s", pq.QuoteIdentifier(pgSchema))
+	}
 	query := fmt.Sprintf(
-		"ALTER DEFAULT PRIVILEGES FOR ROLE %s IN SCHEMA %s REVOKE ALL ON %sS FROM %s",
+		"ALTER DEFAULT PRIVILEGES FOR ROLE %s %s REVOKE ALL ON %sS FROM %s",
 		pq.QuoteIdentifier(d.Get("owner").(string)),
-		pq.QuoteIdentifier(d.Get("schema").(string)),
+		inSchema,
 		strings.ToUpper(d.Get("object_type").(string)),
 		pq.QuoteIdentifier(d.Get("role").(string)),
 	)
-
-	if pgSchema == "" {
-		query = fmt.Sprintf(
-			"ALTER DEFAULT PRIVILEGES FOR ROLE %s REVOKE ALL ON %sS FROM %s",
-			pq.QuoteIdentifier(d.Get("owner").(string)),
-			strings.ToUpper(d.Get("object_type").(string)),
-			pq.QuoteIdentifier(d.Get("role").(string)),
-		)
-	}
 
 	if _, err := txn.Exec(query); err != nil {
 		return fmt.Errorf("could not revoke default privileges: %w", err)
