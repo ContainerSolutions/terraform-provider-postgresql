@@ -236,7 +236,8 @@ func grantRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 	)
 
 	if pgSchema == "" {
-		query = fmt.Sprintf("ALTER DEFAULT PRIVILEGES GRANT %s ON %sS TO %s",
+		query = fmt.Sprintf("ALTER DEFAULT PRIVILEGES FOR ROLE %s GRANT %s ON %sS TO %s",
+			pq.QuoteIdentifier(d.Get("owner").(string)),
 			strings.Join(privileges, ","),
 			strings.ToUpper(d.Get("object_type").(string)),
 			pq.QuoteIdentifier(role),
@@ -265,7 +266,8 @@ func revokeRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 
 	if pgSchema == "" {
 		query = fmt.Sprintf(
-			"ALTER DEFAULT PRIVILEGES REVOKE ALL ON %sS FROM %s",
+			"ALTER DEFAULT PRIVILEGES FOR ROLE %s REVOKE ALL ON %sS FROM %s",
+			pq.QuoteIdentifier(d.Get("owner").(string)),
 			strings.ToUpper(d.Get("object_type").(string)),
 			pq.QuoteIdentifier(d.Get("role").(string)),
 		)
