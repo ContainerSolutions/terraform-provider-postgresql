@@ -161,7 +161,6 @@ func resourcePostgreSQLDefaultPrivilegesDelete(db *DBConnection, d *schema.Resou
 }
 
 func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
-	log.Println("[INFO] In readRoleDefaultPrivileges")
 	role := d.Get("role").(string)
 	owner := d.Get("owner").(string)
 	pgSchema := d.Get("schema").(string)
@@ -206,8 +205,6 @@ func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		return fmt.Errorf("could not read default privileges: %w", err)
 	}
 
-	log.Printf("[DEBUG] %s\n", privileges)
-	log.Printf("[DEBUG] %s\n", privileges)
 	// We consider no privileges as "not exists"
 	if len(privileges) == 0 {
 		log.Printf("[DEBUG] no default privileges for role %s in schema %s", role, pgSchema)
