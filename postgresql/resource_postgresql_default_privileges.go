@@ -89,7 +89,6 @@ func resourcePostgreSQLDefaultPrivilegesRead(db *DBConnection, d *schema.Resourc
 }
 
 func resourcePostgreSQLDefaultPrivilegesCreate(db *DBConnection, d *schema.ResourceData) error {
-	log.Println("[DEBUG] Something happened!")
 
 	if err := validatePrivileges(d); err != nil {
 		return err
