@@ -280,15 +280,12 @@ func revokeRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 
 func generateDefaultPrivilegesID(d *schema.ResourceData) string {
 	pgSchema := d.Get("schema").(string)
-	if pgSchema != "" {
-		return strings.Join([]string{
-			d.Get("role").(string), d.Get("database").(string), pgSchema,
-			d.Get("owner").(string), d.Get("object_type").(string),
-		}, "_")
+	if pgSchema == "" {
+		pgSchema = "noschema"
 	}
 
 	return strings.Join([]string{
-		d.Get("role").(string), d.Get("database").(string),
+		d.Get("role").(string), d.Get("database").(string), pgSchema,
 		d.Get("owner").(string), d.Get("object_type").(string),
 	}, "_")
 
