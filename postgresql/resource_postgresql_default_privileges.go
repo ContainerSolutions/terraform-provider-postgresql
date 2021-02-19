@@ -180,7 +180,6 @@ func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		SELECT defaclnamespace, (aclexplode(defaclacl)).* FROM pg_default_acl
 		WHERE defaclobjtype = $3
 	) AS t (namespace, grantor_oid, grantee_oid, prtype, grantable)
-
 	JOIN pg_namespace ON pg_namespace.oid = namespace
 	WHERE grantee_oid = $1 AND nspname = $2 AND pg_get_userbyid(grantor_oid) = $4;
 `
@@ -190,7 +189,7 @@ func readRoleDefaultPrivileges(txn *sql.Tx, d *schema.ResourceData) error {
 		SELECT defaclnamespace, (aclexplode(defaclacl)).* FROM pg_default_acl
 		WHERE defaclobjtype = $2
 	) AS t (namespace, grantor_oid, grantee_oid, prtype, grantable)
-	WHERE grantee_oid = $1 AND pg_get_userbyid(grantor_oid) = $3;
+	WHERE grantee_oid = $1 AND namespace = 0 AND pg_get_userbyid(grantor_oid) = $3;
 `
 		queryArgs = []interface{}{roleOID, objectTypes[objectType], owner}
 	}
