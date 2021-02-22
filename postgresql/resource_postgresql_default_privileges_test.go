@@ -164,8 +164,7 @@ func TestAccPostgresqlDefaultPrivileges_NoSchema(t *testing.T) {
 	for _, role := range []string{roleName, "public"} {
 		t.Run(role, func(t *testing.T) {
 
-			// We set PGUSER as owner as he will create the test table
-			var tfConfig = fmt.Sprintf(`
+			hclText := `
 resource "postgresql_default_privileges" "test_ro" {
 	database    = "%s"
 	owner       = "%s"
@@ -173,7 +172,9 @@ resource "postgresql_default_privileges" "test_ro" {
 	object_type = "table"
 	privileges   = %%s
 }
-	`, dbName, config.Username, role)
+`
+			// We set PGUSER as owner as he will create the test table
+			var tfConfig = fmt.Sprintf(hclText, dbName, config.Username, role)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck: func() {
@@ -187,8 +188,8 @@ resource "postgresql_default_privileges" "test_ro" {
 						Check: resource.ComposeTestCheckFunc(
 							func(*terraform.State) error {
 								tables := []string{"test_schema.test_table", "dev_schema.test_table"}
-								// To test default privileges, we need to create a table
-								// after having apply the state.
+								// To test default privileges, we need to create tables
+								// in both dev and test schema after having applied the state.
 								dropFunc := createTestTables(t, dbSuffix, tables, "")
 								defer dropFunc()
 
@@ -204,8 +205,8 @@ resource "postgresql_default_privileges" "test_ro" {
 						Check: resource.ComposeTestCheckFunc(
 							func(*terraform.State) error {
 								tables := []string{"test_schema.test_table", "dev_schema.test_table"}
-								// To test default privileges, we need to create a table
-								// after having apply the state.
+								// To test default privileges, we need to create tables
+								// in both dev and test schema after having applied the state.
 								dropFunc := createTestTables(t, dbSuffix, tables, "")
 								defer dropFunc()
 
